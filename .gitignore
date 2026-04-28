@@ -1,0 +1,57 @@
+# Pipeline output — never commit these.
+# The scoring system provides the output directory via volume mount;
+# any output baked into your image is unreachable.
+output/
+local_output/
+
+# Test data and local run artefacts
+tmp/
+
+# Input data files — provided via Docker mount during scoring
+*.csv
+*.jsonl
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Stream data (Stage 3) — provided via Docker mount during scoring
+stream/*.jsonl
+
+# ADR — not required until Stage 3
+adr/
+
+# Local development config — contains machine-specific paths
+config/pipeline_config_local.yaml
+
+# DQ rules — not required until Stage 2
+config/dq_rules.yaml
+
+# Stream — not required until Stage 3
+stream/
+
+# Local run scripts — machine-specific
+run_local.ps1
+
+# Test artefacts
+.pytest_cache/
