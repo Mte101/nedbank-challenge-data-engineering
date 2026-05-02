@@ -40,6 +40,7 @@ sudo mkdir -p /tmp/test-data/input /tmp/test-data/config /tmp/test-data/output
 sudo chmod 777 /tmp/test-data /tmp/test-data/input /tmp/test-data/config /tmp/test-data/output
 
 cp config/pipeline_config.yaml    /tmp/test-data/config/
+cp config/dq_rules.yaml           /tmp/test-data/config/
 cp <your-data>/accounts.csv       /tmp/test-data/input/
 cp <your-data>/customers.csv      /tmp/test-data/input/
 cp <your-data>/transactions.jsonl /tmp/test-data/input/

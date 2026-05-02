@@ -28,15 +28,21 @@ Requirements:
 See output_schema_spec.md for the complete field-by-field specification.
 """
 
-from pipeline.utils import get_connection, load_config, profile_stage, read_delta, write_delta
+from pipeline.utils import get_connection, load_config, parquet_expr, profile_stage, read_delta, write_delta
 
 
-def run_provisioning():
+def _count_delta(con, path: str) -> int:
+    expr = parquet_expr(path)
+    return int(con.execute(f"SELECT COUNT(*) FROM {expr}").fetchone()[0])
+
+
+def run_provisioning() -> dict:
     config = load_config()
     silver = config["output"]["silver_path"]
     gold = config["output"]["gold_path"]
 
     con = get_connection()
+    gold_counts = {}
 
     # ── dim_customers (9 fields) ─────────────────────────────────────────────
     # Built first — needed for FK resolution in fact_transactions.
@@ -75,6 +81,7 @@ def run_provisioning():
             f"{gold}/dim_customers",
         )
         con.unregister("silver_customers")
+        gold_counts["dim_customers"] = _count_delta(con, f"{gold}/dim_customers")
 
     # ── dim_accounts (11 fields, customer_id at position 3) ─────────────────
     with profile_stage("provision.dim_accounts"):
@@ -100,8 +107,9 @@ def run_provisioning():
             f"{gold}/dim_accounts",
         )
         con.unregister("silver_accounts")
+        gold_counts["dim_accounts"] = _count_delta(con, f"{gold}/dim_accounts")
 
-    # ── fact_transactions (14 fields) ────────────────────────────────────────
+    # ── fact_transactions (15 fields) ────────────────────────────────────────
     with profile_stage("provision.fact_transactions"):
         dim_accounts = read_delta(f"{gold}/dim_accounts")
         con.register("dim_accounts", dim_accounts)
@@ -116,10 +124,9 @@ def run_provisioning():
             JOIN dim_customers c ON a.customer_id = c.customer_id
         """)
 
-        silver_transactions = read_delta(f"{silver}/transactions")
-        con.register("silver_transactions", silver_transactions)
+        silver_tx = parquet_expr(f"{silver}/transactions")
 
-        fact_transactions = con.execute("""
+        fact_transactions = con.execute(f"""
             SELECT
                 CAST((hash(t.transaction_id) & 9223372036854775807) AS BIGINT)      AS transaction_sk,
                 t.transaction_id,
@@ -129,18 +136,21 @@ def run_provisioning():
                 t.transaction_timestamp,
                 t.transaction_type,
                 t.merchant_category,
+                t.merchant_subcategory,
                 t.amount,
                 t.currency,
                 t.channel,
                 t.province,
                 t.dq_flag,
                 t.ingestion_timestamp
-            FROM silver_transactions t
+            FROM {silver_tx} t
             LEFT JOIN account_customer ac ON t.account_id = ac.account_id
         """).fetch_record_batch(500_000)
 
         write_delta(fact_transactions, f"{gold}/fact_transactions")
         con.execute("DROP VIEW IF EXISTS account_customer")
-        con.unregister("silver_transactions")
         con.unregister("dim_accounts")
         con.unregister("dim_customers")
+        gold_counts["fact_transactions"] = _count_delta(con, f"{gold}/fact_transactions")
+
+    return gold_counts

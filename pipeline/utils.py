@@ -33,7 +33,7 @@ def load_config() -> dict:
 
 
 def get_connection() -> duckdb.DuckDBPyConnection:
-    os.makedirs("/tmp", exist_ok=True)
+    os.makedirs("/data/tmp", exist_ok=True)
     con = duckdb.connect()
     con.execute("SET temp_directory='/data/tmp'")
     con.execute("SET memory_limit='1GB'")
@@ -41,7 +41,20 @@ def get_connection() -> duckdb.DuckDBPyConnection:
 
 
 def read_delta(path: str, batch_size: int = 300000):
-    return DeltaTable(path).to_pyarrow_dataset().scanner(batch_size=batch_size)
+    # Return the Dataset (not a Scanner) so DuckDB registers it lazily instead
+    # of materialising all rows into its buffer pool at con.register() time.
+    return DeltaTable(path).to_pyarrow_dataset()
+
+
+def parquet_expr(path: str) -> str:
+    """Return a DuckDB read_parquet([...]) expression for all active Delta files.
+
+    Prefer this over read_delta + con.register for large tables (>500k rows).
+    DuckDB's native Parquet reader streams data without buffering the full table.
+    """
+    files = DeltaTable(path).files()
+    paths = ", ".join(f"'{path}/{f}'" for f in files)
+    return f"read_parquet([{paths}])"
 
 
 def write_delta(table, path: str, mode: str = "overwrite") -> None:

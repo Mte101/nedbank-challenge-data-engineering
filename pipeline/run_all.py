@@ -14,11 +14,13 @@ or any code that reads from stdin. The container has no TTY attached.
 """
 
 import logging
+from datetime import datetime, timezone
 
+from pipeline.dq_report import run_dq_report
 from pipeline.ingest import run_ingestion
 from pipeline.provision import run_provisioning
 from pipeline.transform import run_transformation
-from pipeline.utils import profile_stage
+from pipeline.utils import load_config, profile_stage
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -27,9 +29,14 @@ if __name__ == "__main__":
         datefmt="%H:%M:%S",
     )
 
+    run_start = datetime.now(timezone.utc)
+
     with profile_stage("pipeline.ingest"):
         run_ingestion()
     with profile_stage("pipeline.transform"):
-        run_transformation()
+        dq_counts = run_transformation()
     with profile_stage("pipeline.provision"):
-        run_provisioning()
+        gold_counts = run_provisioning()
+
+    run_end = datetime.now(timezone.utc)
+    run_dq_report(dq_counts, gold_counts, load_config(), run_start, run_end)

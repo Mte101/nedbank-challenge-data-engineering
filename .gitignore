@@ -55,3 +55,6 @@ run_local.ps1
 
 # Test artefacts
 .pytest_cache/
+
+# Challenge-specific files
+docs/
