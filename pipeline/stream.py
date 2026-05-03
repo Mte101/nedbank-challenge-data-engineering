@@ -217,13 +217,14 @@ def _update_recent_transactions(new_events: pa.Table, rt_path: str) -> None:
                     FROM new_events
                     UNION ALL
                     SELECT
-                        account_id, transaction_id, transaction_timestamp,
-                        CAST(amount AS DOUBLE) AS amount,
-                        transaction_type, channel, updated_at
-                    FROM {existing_expr}
-                    WHERE (account_id, transaction_id) NOT IN (
-                        SELECT account_id, transaction_id FROM new_events
-                    )
+                        e.account_id, e.transaction_id, e.transaction_timestamp,
+                        CAST(e.amount AS DOUBLE) AS amount,
+                        e.transaction_type, e.channel, e.updated_at
+                    FROM {existing_expr} e
+                    LEFT JOIN new_events n
+                        ON e.account_id = n.account_id
+                       AND e.transaction_id = n.transaction_id
+                    WHERE n.transaction_id IS NULL
                 ) combined
             ) ranked
             WHERE rn <= 50
