@@ -1,0 +1,36 @@
+rules:
+  - code: DUPLICATE_DEDUPED
+    description: Duplicate transaction_id; keep earliest record by transaction_date, transaction_time.
+    applies_to: transactions
+    detection: duplicate transaction_id across raw rows
+    handling_action: DEDUPLICATED_KEEP_FIRST
+
+  - code: ORPHANED_ACCOUNT
+    description: Transaction references an account_id that does not exist in the accounts table.
+    applies_to: transactions
+    detection: account_id not present in silver_accounts
+    handling_action: QUARANTINED
+
+  - code: TYPE_MISMATCH
+    description: amount field was delivered as a JSON string literal instead of a numeric value.
+    applies_to: transactions
+    detection: _amount_was_string = true (flagged during bronze ingestion)
+    handling_action: CAST_TO_DECIMAL
+
+  - code: DATE_FORMAT
+    description: Date field uses a non-ISO-8601 format (DD/MM/YYYY or Unix epoch integer).
+    applies_to: transactions, accounts, customers
+    detection: date value does not match YYYY-MM-DD pattern
+    handling_action: NORMALISED_DATE
+
+  - code: CURRENCY_VARIANT
+    description: currency field contains a non-standard ZAR variant ("R", "RANDS", "710").
+    applies_to: transactions
+    detection: UPPER(currency) IN ('R', 'RANDS', '710')
+    handling_action: NORMALISED_CURRENCY
+
+  - code: NULL_REQUIRED
+    description: Required primary key field (account_id) is NULL in the accounts source file.
+    applies_to: accounts
+    detection: account_id IS NULL
+    handling_action: EXCLUDED_NULL_PK
